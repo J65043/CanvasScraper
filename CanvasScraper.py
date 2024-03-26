@@ -1,48 +1,90 @@
-import os
-import requests
-import sys
+import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import selenium.common.exceptions as exceptions
 
-# Replace with your own API key and Canvas URL
-#API_KEY = "12445~NaV5iCmN4pC9dHO8jwXyGftxyW3g3tzDotuxfDLeyFL0MYymVwyaVGPgz082Bhvu"
-API_KEY = "12445~EYvs41866mImNCy0cmifubPWvV6yiYDXsl12B7IBMq2hoMkFA4LvEcZhOIwROghA"
-CANVAS_URL = "https://canvas.msstate.edu/api/v1"
+# Replace with your Canvas login credentials
+CANVAS_USERNAME = ""
+CANVAS_PASSWORD = ""
 
-# Get the course ID from the command line argument
-if len(sys.argv) != 2:
-    print("Usage: python canvas_downloader.py COURSE_ID")
-    sys.exit(1)
-course_id = sys.argv[1]
+# Replace with your course code and Canvas URL
+COURSE_CODE = ""
+CANVAS_URL = ""
 
-# Make API request to get all the modules for the course
-response = requests.get(f"{CANVAS_URL}/courses/{course_id}/modules", headers={"Authorization": f"Bearer {API_KEY}"})
-if response.status_code != 200:
-    print(f"Error: API request failed with status code {response.status_code}")
-    print(response.content)
-    sys.exit(1)
-modules = response.json()
-print(modules)
-# Loop through each module and download the files in the module
-for module in modules:
-    # Make API request to get all the items in the module
-    response = requests.get(module["items_url"], headers={"Authorization": f"Bearer {API_KEY}"})
-    items = response.json()
+def attachment_handling(driver):
+    attachments = WebDriverWait(driver, 10).until(
+        EC.presence_of_all_elements_located((By.CLASS_NAME, "attachment"))
+    )
 
-    # Create a folder for the module
-    module_folder = f"{module['name']} ({module['id']})"
-    os.makedirs(module_folder, exist_ok=True)
+    for attachment in attachments:
+        item_button = attachment.find_element(By.CLASS_NAME, "ig-title")
+        print(item_button.text)
+        link = item_button.get_attribute("href")
+        driver.get(link)
 
-    # Loop through each item in the module and download its attachments
-    for item in items:
-        # Make API request to get the item details
-        response = requests.get(item["url"], headers={"Authorization": f"Bearer {API_KEY}"})
-        item_details = response.json()
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_all_elements_located((By.XPATH, "//a[@download='true']"))
+        )
+        downloads = driver.find_elements(By.XPATH, "//a[@download='true']")
+        for download in downloads:
+            download.click()
 
-        # Loop through each attachment and download it
-        for attachment in item_details.get("attachments", []):
-            attachment_url = attachment["url"]
-            file_name = attachment["filename"]
+        driver.back()
 
-            # Download the file and save it in the module folder
-            response = requests.get(attachment_url, headers={"Authorization": f"Bearer {API_KEY}"})
-            with open(os.path.join(module_folder, file_name), "wb") as f:
-                f.write(response.content)
+def process_assignments(driver):
+    assignments = WebDriverWait(driver, 10).until(
+        EC.presence_of_all_elements_located((By.CLASS_NAME, "ig-row"))
+    )
+
+    for assignment in assignments:
+        icon = assignment.find_element(By.CLASS_NAME, "type_icon")
+        if icon.get_attribute("title") in ["Attachment", "Page"]:
+            link = assignment.find_element(By.CLASS_NAME, "ig-title")
+            link.click()
+
+            if icon.get_attribute("title") == "Attachment":
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.XPATH, "//a[@download='true']"))
+                )
+                download_link = driver.find_element(By.XPATH, "//a[@download='true']")
+                download_link.click()
+            elif icon.get_attribute("title") == "Page":
+                try:
+                    WebDriverWait(driver, 10).until(
+                        EC.presence_of_all_elements_located((By.CLASS_NAME, "file_download_btn"))
+                    )
+                    downloads = driver.find_elements(By.CLASS_NAME, "file_download_btn")
+                    for download in downloads:
+                        download.click()
+                except exceptions.TimeoutException:
+                    print("No downloadable content on page.")
+
+            driver.back()
+
+def main():
+    options = webdriver.ChromeOptions()
+    options.add_argument("start-maximized")
+    driver = webdriver.Chrome(options=options)
+
+    driver.get(f"{CANVAS_URL}")
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "username"))).send_keys(CANVAS_USERNAME)
+    driver.find_element(By.ID, "password").send_keys(CANVAS_PASSWORD, Keys.RETURN)
+
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "duo_iframe")))
+    driver.switch_to.frame(driver.find_element(By.ID, "duo_iframe"))
+    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space()='Send Me a Push']"))).click()
+    driver.switch_to.default_content()
+
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "ic-DashboardCard__header")))
+    driver.get(f"{CANVAS_URL}/courses/{COURSE_CODE}/modules")
+
+    process_assignments(driver)
+
+    print("quitting browser")
+    driver.quit()
+
+if __name__ == "__main__":
+    main()
