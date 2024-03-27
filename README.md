@@ -28,7 +28,7 @@ Disclaimer
     WebDriver Setup:
     Download the Chrome WebDriver that matches your Chrome version from ChromeDriver - WebDriver for Chrome. Ensure it's in your PATH or specify its location in the script.
 
-Configuration
+# Configuration
 
     Update the script with your Canvas credentials, course code, and Canvas URL:
 
