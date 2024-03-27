@@ -1,7 +1,8 @@
 # Introduction
 
 This script is a Canvas Scraper that automates the process of downloading attachments and files from your Canvas course modules. It uses Selenium for web scraping and automates interactions with the Canvas web interface, including handling Duo Mobile two-factor authentication (specific to the configured school's Canvas setup).
-Disclaimer
+
+# Disclaimer
 
     School-Specific Duo Mobile Policy: The script's handling of Duo Mobile two-factor authentication is tailored to a specific school's Canvas setup. It may not work with other institutions' Duo Mobile configurations.
     Potential Out-of-Date Methods: The methods used in this script may become outdated due to changes in Canvas or Duo Mobile's policies and interfaces.
